@@ -12,7 +12,7 @@ st.set_page_config(page_title="積ん読デバッグ", page_icon="🔧", layout=
 # ★ここにAPIキーを入れる
 API_KEY = "AIzaSyBWgr8g-cA6zybuyDHD9rhP2sS34uAj_24"
 genai.configure(api_key=API_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash')
+model = genai.GenerativeModel('gemini-2.5-flash')
 
 # --- DB接続 ---
 scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
@@ -113,3 +113,4 @@ if st.button("実行"):
                 st.error("❌ AI解析で停止")
         else:
             st.error("❌ スクレイピングで停止")
+
