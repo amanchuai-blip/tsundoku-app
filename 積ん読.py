@@ -4,7 +4,6 @@ import trafilatura
 import json
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-import re # JSON抽出のために必要です
 
 # --- 1. アプリ全体のデザイン ---
 st.set_page_config(page_title="積ん読解消♡Mate", page_icon="🎀", layout="centered")
@@ -152,3 +151,4 @@ with tab2:
                 
     except Exception as e:
         st.error("データの読み込みに失敗しました。シートの1行目にヘッダーがあるか確認してね！")
+
