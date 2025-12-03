@@ -4,20 +4,39 @@ import trafilatura
 import json
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-import re 
+# 正規表現は不要になりましたが、以下のimportは必要です
+from google.generativeai.types import GenerationConfig, Schema, Type 
 
 # --- 1. アプリ全体のデザイン ---
 st.set_page_config(page_title="積ん読解消♡Mate", page_icon="🎀", layout="centered")
 
-# --- 2. 設定（APIキー & DB接続） ---
+# --- 2. モデルと設定（最も安定したJSON生成方法） ---
 # ★ここにあなたのGemini APIキーを入れてください
 API_KEY = "AIzaSyBWgr8g-cA6zybuyDHD9rhP2sS34uAj_24"
 genai.configure(api_key=API_KEY)
 
-# モデルをユーザー様の指示に基づき「Gemini 2.5 Flash」に復元
+# ユーザー様の指示に基づきモデルを指定
 model = genai.GenerativeModel('gemini-2.5-flash')
 
-# Google Sheets 接続設定
+# 【JSON構造の定義】これこそが、プログラムが欲しいデータの型（スキーマ）です
+tsundoku_schema = Schema(
+    type=Type.OBJECT,
+    properties={
+        "title": Schema(type=Type.STRING, description="記事のキャッチーなタイトル"),
+        "summary": Schema(type=Type.STRING, description="3行程度の要約"),
+        "point": Schema(type=Type.STRING, description="最も重要なポイント"),
+        "action": Schema(type=Type.STRING, description="ユーザーが明日から実行すべき具体的な行動")
+    },
+    required=["title", "summary", "point", "action"]
+)
+
+# 【API設定】JSON形式を強制し、上記スキーマを適用
+config = GenerationConfig(
+    response_mime_type="application/json",
+    response_schema=tsundoku_schema
+)
+
+# Google Sheets 接続設定（省略）
 scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
 
 @st.cache_resource
@@ -27,6 +46,7 @@ def get_worksheet():
         if "gcp_service_account" not in st.secrets:
             st.error("設定エラー: SecretsにGoogle Cloudの鍵が見つからないよ💦")
             return None
+            
         creds_dict = dict(st.secrets["gcp_service_account"])
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
@@ -49,33 +69,23 @@ def fetch_text(url):
         return None
 
 def analyze_text(text):
-    """Gemini 2.5 Flash先生に要約をお願いします"""
-    prompt = f"""
-    あなたは優秀な専属秘書です。以下の記事を読んで、忙しい私のために要点をまとめてください。
-    出力は必ず以下のJSON形式のみでお願いします。余計な前置きや説明文は一切書かないでください。
-    {{
-        "title": "記事のタイトル（キャッチーに）",
-        "summary": "3行で要約",
-        "point": "一番の重要ポイント",
-        "action": "私が明日からやるべき具体的なAction"
-    }}
-    ---記事本文---
-    {text[:10000]}
-    """
+    """GeminiにJSONの生成を強制します"""
+    # プロンプトはシンプルに。構造はAPI設定で保証されるため。
+    prompt = "以下の記事を、定義されたJSONスキーマに従って分析してください。"
+    
     try:
-        response = model.generate_content(prompt)
+        # configを渡すことで、JSON形式での回答が保証されます
+        response = model.generate_content(
+            [prompt, text[:10000]],
+            config=config 
+        )
         
-        # 正規表現で、回答全体から波括弧{...}で囲まれたJSONブロックだけを確実に抽出する
-        match = re.search(r'\{.*\}', response.text, re.DOTALL)
-        
-        if match:
-            cleaned_text = match.group(0)
-            return json.loads(cleaned_text) 
-        else:
-            return None
-            
+        # 回答はJSON形式で返ってくるので、そのままパースします
+        return json.loads(response.text) 
+
     except Exception as e:
-        print(f"API/JSON Error: {e}")
+        # APIエラーや無効な回答が返ってきた場合に失敗
+        print(f"API/Structured Output Error: {e}")
         return None
 
 def add_to_sheet(ws, url, data):
@@ -123,8 +133,8 @@ with tab1:
                         else:
                             st.error("保存に失敗しちゃった...スプレッドシートの権限大丈夫かな？💦")
                     else:
-                        # JSONパースまたはモデル回答失敗
-                        st.error("ごめんね、AIが内容を理解できなかったみたい...😭（JSON形式に変換できませんでした）")
+                        # 構造化出力が失敗した場合（モデルが意図的に回答を拒否した場合など）
+                        st.error("ごめんね、AIが内容を理解できなかったみたい...😭（モデルがJSON生成を拒否しました）")
                 else:
                     st.error("ページが開けなかったよ...URLが正しいか確認してね🤔")
 
