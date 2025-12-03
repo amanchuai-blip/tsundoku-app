@@ -4,25 +4,28 @@ import trafilatura
 import json
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-import traceback
 
-st.set_page_config(page_title="積ん読デバッグ", page_icon="🔧", layout="centered")
+# --- 1. アプリ全体のデザイン ---
+st.set_page_config(page_title="積ん読解消♡Mate", page_icon="🎀", layout="centered")
 
-# --- 設定 ---
-# ★ここにAPIキーを入れる
-API_KEY = "AIzaSyBWgr8g-cA6zybuyDHD9rhP2sS34uAj_24"
+# --- 2. 設定（APIキー & DB接続） ---
+# ★ここにあなたのGemini APIキーを入れてね
+API_KEY = "YOUR_API_KEY"
 genai.configure(api_key=API_KEY)
+
+# モデルを高性能な
+#　'gemini-2.5-flash' に
 model = genai.GenerativeModel('gemini-2.5-flash')
 
-# --- DB接続 ---
+# Google Sheets 接続設定
 scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
 
 @st.cache_resource
 def get_worksheet():
+    """DB(シート)に接続する関数"""
     try:
-        # Secretsの確認
         if "gcp_service_account" not in st.secrets:
-            st.error("Secretsに 'gcp_service_account' が設定されていません！")
+            st.error("設定エラー: SecretsにGoogle Cloudの鍵が見つからないよ💦")
             return None
             
         creds_dict = dict(st.secrets["gcp_service_account"])
@@ -30,87 +33,112 @@ def get_worksheet():
         client = gspread.authorize(creds)
         return client.open("積ん読DB").sheet1
     except Exception as e:
-        st.error(f"💥 DB接続エラー:\n{e}")
+        st.error(f"DBに繋がらないみたい...権限設定を確認してね🥺\n{e}")
         return None
 
-# --- ロジック（エラーを表示するように改造） ---
+# --- 3. 裏方の仕事（関数） ---
 
 def fetch_text(url):
+    """URLから本文を優しく抜き出します"""
     try:
         downloaded = trafilatura.fetch_url(url)
-        if downloaded is None:
-            st.error(f"URLからデータを取得できませんでした。サイト側でブロックされている可能性があります。\nURL: {url}")
+        if not downloaded:
             return None
         text = trafilatura.extract(downloaded)
-        if text is None:
-            st.error("本文の抽出に失敗しました。")
-            return None
         return text
-    except Exception as e:
-        st.error(f"💥 スクレイピングエラー:\n{e}")
+    except:
         return None
 
 def analyze_text(text):
+    """Gemini Pro先生に要約をお願いします"""
     prompt = f"""
-    以下の記事を読んでJSON形式で出力してください。
+    あなたは優秀な専属秘書です。以下の記事を読んで、忙しい私のために要点をまとめてください。
+    出力は必ず以下のJSON形式のみでお願いします。
     {{
-        "title": "記事タイトル",
-        "summary": "3行要約",
-        "point": "重要ポイント",
-        "action": "Next Action"
+        "title": "記事のタイトル（キャッチーに）",
+        "summary": "3行で要約",
+        "point": "一番の重要ポイント",
+        "action": "私が明日からやるべき具体的なAction"
     }}
-    ---
-    {text[:5000]}
+    ---記事本文---
+    {text[:10000]}
     """
     try:
         response = model.generate_content(prompt)
-        # 生のレスポンスを表示（デバッグ用）
-        print(f"Gemini Response: {response.text}") 
-        
-        return json.loads(response.text.replace("```json", "").replace("```", ""))
-    except Exception as e:
-        st.error(f"💥 Geminiエラー（APIキーかプロンプトが原因かも）:\n{e}")
-        # 詳細なトレースバックを表示
-        st.text(traceback.format_exc())
+        # JSONの整形（```json とかを削除）
+        cleaned_text = response.text.replace("```json", "").replace("```", "")
+        return json.loads(cleaned_text)
+    except:
         return None
 
 def add_to_sheet(ws, url, data):
+    """スプレッドシートに書き込みます"""
     try:
+        # 2行目に挿入（1行目はヘッダーなので）
         ws.insert_row([data['title'], url, data['summary'], data['point'], data['action']], 2)
-    except Exception as e:
-        st.error(f"💥 スプレッドシート書き込みエラー:\n{e}")
+        return True
+    except:
+        return False
 
-# --- UI ---
-st.title("🔧 デバッグモード")
+# --- 4. 画面を作る（UI） ---
 
+st.title("🎀 積ん読解消 Mate")
+st.markdown("「あとで読む」を「今、分かった！」に変えちゃおう✨")
+
+# DB接続
 ws = get_worksheet()
 if not ws:
     st.stop()
 
-url = st.text_input("URLを入力", placeholder="https://...")
+# タブ作成
+tab1, tab2 = st.tabs(["📥 記事を入れる", "📚 わたしの本棚"])
 
-if st.button("実行"):
-    if not url:
-        st.warning("URLが空です")
-    else:
-        st.info("処理開始...")
-        
-        # 1. スクレイピング
-        text = fetch_text(url)
-        if text:
-            st.success("✅ 本文取得成功")
-            
-            # 2. AI解析
-            result = analyze_text(text)
-            if result:
-                st.success("✅ AI解析成功")
-                st.json(result) # 解析結果を画面に出す
-                
-                # 3. DB保存
-                add_to_sheet(ws, url, result)
-                st.success("✅ DB保存完了")
-            else:
-                st.error("❌ AI解析で停止")
+# --- タブ1：記事登録 ---
+with tab1:
+    st.write("### 読みたい記事のURLを教えてね")
+    url_input = st.text_input("ここにペタッと貼り付け 👇", placeholder="https://...")
+
+    if st.button("✨ AIに読んでもらう"):
+        if not url_input:
+            st.warning("あれ？URLが空っぽだよ🥺")
         else:
-            st.error("❌ スクレイピングで停止")
+            with st.spinner("Gemini Proが熟読中...ちょっと待ってね☕"):
+                # 1. 本文取得
+                text = fetch_text(url_input)
+                
+                if text:
+                    # 2. AI解析
+                    result = analyze_text(text)
+                    if result:
+                        # 3. DB保存
+                        if add_to_sheet(ws, url_input, result):
+                            st.balloons() # 成功の舞！
+                            st.success("読み終わったよ！「わたしの本棚」に追加しました💕")
+                        else:
+                            st.error("保存に失敗しちゃった...スプレッドシートの権限大丈夫かな？💦")
+                    else:
+                        st.error("ごめんね、AIが内容を理解できなかったみたい...😭")
+                else:
+                    st.error("ページが開けなかったよ...URLが正しいか確認してね🤔")
 
+# --- タブ2：本棚 ---
+with tab2:
+    if st.button("🔄 リストを更新"):
+        st.rerun()
+    
+    try:
+        records = ws.get_all_records()
+        if not records:
+            st.info("まだ空っぽだよ。何か記事を入れてみてね！🐣")
+        
+        # 新しい順（リストの逆順）で表示
+        for item in reversed(records):
+            title = item.get('title', 'No Title')
+            with st.expander(f"📖 {title}", expanded=True):
+                st.markdown(f"**要約:** {item.get('summary')}")
+                st.info(f"💡 **Point:** {item.get('point')}")
+                st.success(f"🚀 **Action:** {item.get('action')}")
+                st.caption(f"Source: {item.get('url')}")
+                
+    except Exception as e:
+        st.error("データの読み込みに失敗しました。シートの1行目にヘッダーがあるか確認してね！")
