@@ -51,7 +51,7 @@ def fetch_text(url):
         return None
 
 def analyze_text(text):
-    """Gemini 2.5 Pro先生に要約をお願いします"""
+    """Gemini 2.5 Pro先生に要約をお願いします（デバッグ用）"""
     prompt = f"""
     あなたは優秀な専属秘書です。以下の記事を読んで、忙しい私のために要点をまとめてください。
     出力は必ず以下のJSON形式のみでお願いします。
@@ -67,17 +67,24 @@ def analyze_text(text):
     try:
         response = model.generate_content(prompt)
         
-        # 【修正部分】回答全体から、波括弧{...}で囲まれたJSONブロックだけを抽出する
+        # 画面に生の回答を表示 (デバッグ用)
+        st.subheader("🚨 Raw Gemini Output (Debug)")
+        st.code(response.text, language='text')
+        
+        # JSON抽出ロジック（前回修正済み）
         match = re.search(r'\{.*\}', response.text, re.DOTALL)
         
         if match:
             cleaned_text = match.group(0)
-            return json.loads(cleaned_text)
+            # JSONパースを試みる
+            return json.loads(cleaned_text) 
         else:
-            # JSONブロックが見つからなかった場合
-            return None # 失敗
+            st.error("❌ JSONブロックの抽出に失敗しました。モデルがJSON以外の返答をした可能性があります。")
+            return None
             
-    except:
+    except Exception as e:
+        # 処理中に起きた例外を全てキャッチして表示
+        st.error(f"💥 解析エラー発生: {type(e).__name__}: {e}")
         return None
 
 def add_to_sheet(ws, url, data):
@@ -151,4 +158,5 @@ with tab2:
                 
     except Exception as e:
         st.error("データの読み込みに失敗しました。シートの1行目にヘッダーがあるか確認してね！")
+
 
