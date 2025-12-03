@@ -14,7 +14,7 @@ API_KEY = "AIzaSyBWgr8g-cA6zybuyDHD9rhP2sS34uAj_24"
 genai.configure(api_key=API_KEY)
 
 # 最新のGemini 2.5 Proモデルを使用
-model = genai.GenerativeModel('gemini-2.5-pro')
+model = genai.GenerativeModel('gemini-2.5-flash')
 
 # Google Sheets 接続設定
 scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
@@ -151,4 +151,5 @@ with tab2:
                 
     except Exception as e:
         st.error("データの読み込みに失敗しました。シートの1行目にヘッダーがあるか確認してね！")
+
 
