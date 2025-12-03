@@ -10,8 +10,8 @@ st.set_page_config(page_title="積ん読解消♡Mate", page_icon="🎀", layout
 
 # --- 2. 接続設定 ---
 # ★ Gemini APIキー (GitHubで編集するときにここを書き換えてね)
-API_KEY = "AIzaSyBWgr8g-cA6zybuyDHD9rhP2sS34uAj_24"
-genai.configure(api_key=API_KEY)
+API_KEY = 'AIzaSyBWgr8g-cA6zybuyDHD9rhP2sS34uAj_24'
+genai.configure(api_key='AIzaSyBWgr8g-cA6zybuyDHD9rhP2sS34uAj_24')
 model = genai.GenerativeModel('gemini-1.5-flash')
 
 # Google Sheets 接続設定
@@ -100,4 +100,5 @@ with tab2:
             st.info(f"Point: {item.get('point')}")
             st.success(f"Action: {item.get('action')}")
             st.caption(f"URL: {item.get('url')}")
+
 
