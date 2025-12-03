@@ -4,7 +4,7 @@ import trafilatura
 import json
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-import re # JSON抽出ロジックに必要です
+import re 
 
 # --- 1. アプリ全体のデザイン ---
 st.set_page_config(page_title="積ん読解消♡Mate", page_icon="🎀", layout="centered")
@@ -14,7 +14,7 @@ st.set_page_config(page_title="積ん読解消♡Mate", page_icon="🎀", layout
 API_KEY = "AIzaSyBWgr8g-cA6zybuyDHD9rhP2sS34uAj_24"
 genai.configure(api_key=API_KEY)
 
-# モデルをユーザー様の指示に基づき「Gemini 2.5 Flash」に設定します
+# モデルをユーザー様の指示に基づき「Gemini 2.5 Flash」に復元
 model = genai.GenerativeModel('gemini-2.5-flash')
 
 # Google Sheets 接続設定
@@ -27,14 +27,11 @@ def get_worksheet():
         if "gcp_service_account" not in st.secrets:
             st.error("設定エラー: SecretsにGoogle Cloudの鍵が見つからないよ💦")
             return None
-            
         creds_dict = dict(st.secrets["gcp_service_account"])
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
-        # ファイル名「積ん読DB」でシートを開く
         return client.open("積ん読DB").sheet1
     except Exception as e:
-        # DB接続失敗時（権限設定など）
         st.error(f"DBに繋がらないみたい...権限設定を確認してね🥺\n{e}")
         return None
 
@@ -75,18 +72,15 @@ def analyze_text(text):
             cleaned_text = match.group(0)
             return json.loads(cleaned_text) 
         else:
-            # JSONブロックが見つからなかった場合
             return None
             
     except Exception as e:
-        # API認証エラーやモデルが見つからないエラーはここでキャッチ
         print(f"API/JSON Error: {e}")
         return None
 
 def add_to_sheet(ws, url, data):
     """スプレッドシートに書き込みます"""
     try:
-        # 2行目に挿入（1行目はヘッダーなので）
         ws.insert_row([data['title'], url, data['summary'], data['point'], data['action']], 2)
         return True
     except:
@@ -129,7 +123,8 @@ with tab1:
                         else:
                             st.error("保存に失敗しちゃった...スプレッドシートの権限大丈夫かな？💦")
                     else:
-                        st.error("ごめんね、AIが内容を理解できなかったみたい...😭（JSONパースエラーか、モデルの回答拒否）")
+                        # JSONパースまたはモデル回答失敗
+                        st.error("ごめんね、AIが内容を理解できなかったみたい...😭（JSON形式に変換できませんでした）")
                 else:
                     st.error("ページが開けなかったよ...URLが正しいか確認してね🤔")
 
