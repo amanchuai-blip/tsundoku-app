@@ -9,13 +9,13 @@ from oauth2client.service_account import ServiceAccountCredentials
 st.set_page_config(page_title="積ん読解消♡Mate", page_icon="🎀", layout="centered")
 
 # --- 2. 設定（APIキー & DB接続） ---
-# ★ここにあなたのGemini APIキーを入れてください
+# ★ここにあなたのGemini APIキーを入れてね
 API_KEY = "AIzaSyBWgr8g-cA6zybuyDHD9rhP2sS34uAj_24"
 genai.configure(api_key=API_KEY)
 
-# モデルを最新の「2.5 Pro」版にアップグレード！
-# ユーザー様からの情報に基づき、最新のモデルを指定します。
-model = genai.GenerativeModel('gemini-2.5-flash')
+# モデルを高性能な「Pro」版にアップグレード！
+# ※もし動作が重すぎたら 'gemini-1.5-flash' に戻してね
+model = genai.GenerativeModel('gemini-2.5-pro')
 
 # Google Sheets 接続設定
 scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
@@ -50,7 +50,7 @@ def fetch_text(url):
         return None
 
 def analyze_text(text):
-    """Gemini 2.5 Pro先生に要約をお願いします"""
+    """Gemini Pro先生に要約をお願いします"""
     prompt = f"""
     あなたは優秀な専属秘書です。以下の記事を読んで、忙しい私のために要点をまとめてください。
     出力は必ず以下のJSON形式のみでお願いします。
@@ -65,7 +65,7 @@ def analyze_text(text):
     """
     try:
         response = model.generate_content(prompt)
-        # JSONの整形
+        # JSONの整形（```json とかを削除）
         cleaned_text = response.text.replace("```json", "").replace("```", "")
         return json.loads(cleaned_text)
     except:
@@ -102,7 +102,7 @@ with tab1:
         if not url_input:
             st.warning("あれ？URLが空っぽだよ🥺")
         else:
-            with st.spinner("Gemini 2.5 Proが熟読中...ちょっと待ってね☕"):
+            with st.spinner("Gemini Proが熟読中...ちょっと待ってね☕"):
                 # 1. 本文取得
                 text = fetch_text(url_input)
                 
@@ -142,11 +142,3 @@ with tab2:
                 
     except Exception as e:
         st.error("データの読み込みに失敗しました。シートの1行目にヘッダーがあるか確認してね！")
-
----
-
-### 🚨 インフラエンジニア向けの注意点
-ご指摘の通り、モデル名を `gemini-2.5-pro` に設定しました。
-もしコミット後にアプリで **「404 Model Not Found」** のようなエラーが再度発生した場合は、**Gemini APIがまだそのモデル名を完全にはサポートしていない**、あるいは**APIキーが対応モデルと紐づいていない**可能性が高いです。
-
-その場合は、お手数ですがモデル名を一つ戻して **`gemini-1.5-pro`** でお試しください。これで現在の最新安定版の利用に戻ります。
