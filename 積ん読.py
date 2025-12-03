@@ -4,18 +4,18 @@ import trafilatura
 import json
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+import re # JSON抽出ロジックに必要です
 
 # --- 1. アプリ全体のデザイン ---
 st.set_page_config(page_title="積ん読解消♡Mate", page_icon="🎀", layout="centered")
 
 # --- 2. 設定（APIキー & DB接続） ---
-# ★ここにあなたのGemini APIキーを入れてね
+# ★ここにあなたのGemini APIキーを入れてください
 API_KEY = "AIzaSyBWgr8g-cA6zybuyDHD9rhP2sS34uAj_24"
 genai.configure(api_key=API_KEY)
 
-# モデルを高性能な「Pro」版にアップグレード！
-# ※もし動作が重すぎたら 'gemini-1.5-flash' に戻してね
-model = genai.GenerativeModel('gemini-2.5-pro')
+# モデルをユーザー様の指示に基づき「Gemini 2.5 Flash」に設定します
+model = genai.GenerativeModel('gemini-2.5-flash')
 
 # Google Sheets 接続設定
 scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
@@ -31,8 +31,10 @@ def get_worksheet():
         creds_dict = dict(st.secrets["gcp_service_account"])
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
+        # ファイル名「積ん読DB」でシートを開く
         return client.open("積ん読DB").sheet1
     except Exception as e:
+        # DB接続失敗時（権限設定など）
         st.error(f"DBに繋がらないみたい...権限設定を確認してね🥺\n{e}")
         return None
 
@@ -50,10 +52,10 @@ def fetch_text(url):
         return None
 
 def analyze_text(text):
-    """Gemini Pro先生に要約をお願いします"""
+    """Gemini 2.5 Flash先生に要約をお願いします"""
     prompt = f"""
     あなたは優秀な専属秘書です。以下の記事を読んで、忙しい私のために要点をまとめてください。
-    出力は必ず以下のJSON形式のみでお願いします。
+    出力は必ず以下のJSON形式のみでお願いします。余計な前置きや説明文は一切書かないでください。
     {{
         "title": "記事のタイトル（キャッチーに）",
         "summary": "3行で要約",
@@ -65,10 +67,20 @@ def analyze_text(text):
     """
     try:
         response = model.generate_content(prompt)
-        # JSONの整形（```json とかを削除）
-        cleaned_text = response.text.replace("```json", "").replace("```", "")
-        return json.loads(cleaned_text)
-    except:
+        
+        # 正規表現で、回答全体から波括弧{...}で囲まれたJSONブロックだけを確実に抽出する
+        match = re.search(r'\{.*\}', response.text, re.DOTALL)
+        
+        if match:
+            cleaned_text = match.group(0)
+            return json.loads(cleaned_text) 
+        else:
+            # JSONブロックが見つからなかった場合
+            return None
+            
+    except Exception as e:
+        # API認証エラーやモデルが見つからないエラーはここでキャッチ
+        print(f"API/JSON Error: {e}")
         return None
 
 def add_to_sheet(ws, url, data):
@@ -85,7 +97,7 @@ def add_to_sheet(ws, url, data):
 st.title("🎀 積ん読解消 Mate")
 st.markdown("「あとで読む」を「今、分かった！」に変えちゃおう✨")
 
-# DB接続
+# DB接続チェック
 ws = get_worksheet()
 if not ws:
     st.stop()
@@ -102,7 +114,7 @@ with tab1:
         if not url_input:
             st.warning("あれ？URLが空っぽだよ🥺")
         else:
-            with st.spinner("Gemini Proが熟読中...ちょっと待ってね☕"):
+            with st.spinner("Gemini 2.5 Flashが熟読中...ちょっと待ってね☕"):
                 # 1. 本文取得
                 text = fetch_text(url_input)
                 
@@ -117,7 +129,7 @@ with tab1:
                         else:
                             st.error("保存に失敗しちゃった...スプレッドシートの権限大丈夫かな？💦")
                     else:
-                        st.error("ごめんね、AIが内容を理解できなかったみたい...😭")
+                        st.error("ごめんね、AIが内容を理解できなかったみたい...😭（JSONパースエラーか、モデルの回答拒否）")
                 else:
                     st.error("ページが開けなかったよ...URLが正しいか確認してね🤔")
 
