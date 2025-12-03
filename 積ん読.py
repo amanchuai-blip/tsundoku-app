@@ -4,6 +4,7 @@ import trafilatura
 import json
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+import re
 
 # --- 1. アプリ全体のデザイン ---
 st.set_page_config(page_title="積ん読解消♡Mate", page_icon="🎀", layout="centered")
@@ -50,7 +51,7 @@ def fetch_text(url):
         return None
 
 def analyze_text(text):
-    """Gemini Pro先生に要約をお願いします"""
+    """Gemini 2.5 Pro先生に要約をお願いします"""
     prompt = f"""
     あなたは優秀な専属秘書です。以下の記事を読んで、忙しい私のために要点をまとめてください。
     出力は必ず以下のJSON形式のみでお願いします。
@@ -65,9 +66,17 @@ def analyze_text(text):
     """
     try:
         response = model.generate_content(prompt)
-        # JSONの整形（```json とかを削除）
-        cleaned_text = response.text.replace("```json", "").replace("```", "")
-        return json.loads(cleaned_text)
+        
+        # 【修正部分】回答全体から、波括弧{...}で囲まれたJSONブロックだけを抽出する
+        match = re.search(r'\{.*\}', response.text, re.DOTALL)
+        
+        if match:
+            cleaned_text = match.group(0)
+            return json.loads(cleaned_text)
+        else:
+            # JSONブロックが見つからなかった場合
+            return None # 失敗
+            
     except:
         return None
 
@@ -142,3 +151,4 @@ with tab2:
                 
     except Exception as e:
         st.error("データの読み込みに失敗しました。シートの1行目にヘッダーがあるか確認してね！")
+
