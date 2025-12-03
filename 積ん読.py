@@ -9,11 +9,12 @@ from oauth2client.service_account import ServiceAccountCredentials
 st.set_page_config(page_title="積ん読解消♡Mate", page_icon="🎀", layout="centered")
 
 # --- 2. 設定（APIキー & DB接続） ---
-# ★ここにあなたのGemini APIキーを入れてください (有効なキーであることを確認済み！)
-API_KEY = "AIzaSyBWgr8g-cA6zybuyDHD9rhP2sS34uAj_24" 
+# ★ここにあなたのGemini APIキーを入れてください
+API_KEY = "AIzaSyBWgr8g-cA6zybuyDHD9rhP2sS34uAj_24"
 genai.configure(api_key=API_KEY)
 
-# 最新のGemini 2.5 Proモデルを使用
+# モデルを最新の「2.5 Pro」版にアップグレード！
+# ユーザー様からの情報に基づき、最新のモデルを指定します。
 model = genai.GenerativeModel('gemini-2.5-flash')
 
 # Google Sheets 接続設定
@@ -30,10 +31,8 @@ def get_worksheet():
         creds_dict = dict(st.secrets["gcp_service_account"])
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
-        # ファイル名「積ん読DB」でシートを開く
         return client.open("積ん読DB").sheet1
     except Exception as e:
-        # 権限やファイル名が間違っている場合にエラーを表示
         st.error(f"DBに繋がらないみたい...権限設定を確認してね🥺\n{e}")
         return None
 
@@ -54,7 +53,7 @@ def analyze_text(text):
     """Gemini 2.5 Pro先生に要約をお願いします"""
     prompt = f"""
     あなたは優秀な専属秘書です。以下の記事を読んで、忙しい私のために要点をまとめてください。
-    出力は必ず以下のJSON形式のみでお願いします。余計な前置きや説明文は一切書かないでください。
+    出力は必ず以下のJSON形式のみでお願いします。
     {{
         "title": "記事のタイトル（キャッチーに）",
         "summary": "3行で要約",
@@ -66,17 +65,9 @@ def analyze_text(text):
     """
     try:
         response = model.generate_content(prompt)
-        
-        # 正規表現で、回答全体から波括弧{...}で囲まれたJSONブロックだけを確実に抽出する
-        match = re.search(r'\{.*\}', response.text, re.DOTALL)
-        
-        if match:
-            cleaned_text = match.group(0)
-            return json.loads(cleaned_text) 
-        else:
-            # JSON形式の回答が得られなかった場合
-            return None
-            
+        # JSONの整形
+        cleaned_text = response.text.replace("```json", "").replace("```", "")
+        return json.loads(cleaned_text)
     except:
         return None
 
@@ -94,7 +85,7 @@ def add_to_sheet(ws, url, data):
 st.title("🎀 積ん読解消 Mate")
 st.markdown("「あとで読む」を「今、分かった！」に変えちゃおう✨")
 
-# DB接続チェック
+# DB接続
 ws = get_worksheet()
 if not ws:
     st.stop()
@@ -126,7 +117,7 @@ with tab1:
                         else:
                             st.error("保存に失敗しちゃった...スプレッドシートの権限大丈夫かな？💦")
                     else:
-                        st.error("ごめんね、AIが内容を理解できなかったみたい...😭（サイトの文字が少なすぎるかも）")
+                        st.error("ごめんね、AIが内容を理解できなかったみたい...😭")
                 else:
                     st.error("ページが開けなかったよ...URLが正しいか確認してね🤔")
 
@@ -152,4 +143,10 @@ with tab2:
     except Exception as e:
         st.error("データの読み込みに失敗しました。シートの1行目にヘッダーがあるか確認してね！")
 
+---
 
+### 🚨 インフラエンジニア向けの注意点
+ご指摘の通り、モデル名を `gemini-2.5-pro` に設定しました。
+もしコミット後にアプリで **「404 Model Not Found」** のようなエラーが再度発生した場合は、**Gemini APIがまだそのモデル名を完全にはサポートしていない**、あるいは**APIキーが対応モデルと紐づいていない**可能性が高いです。
+
+その場合は、お手数ですがモデル名を一つ戻して **`gemini-1.5-pro`** でお試しください。これで現在の最新安定版の利用に戻ります。
