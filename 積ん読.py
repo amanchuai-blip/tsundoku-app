@@ -4,7 +4,7 @@ import trafilatura
 import json
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-import time # トースト表示のウェイト調整用
+import time 
 
 # --- 1. アプリ全体のデザイン ---
 st.set_page_config(page_title="積ん読解消♡Mate", page_icon="🎀", layout="centered")
@@ -13,8 +13,8 @@ st.set_page_config(page_title="積ん読解消♡Mate", page_icon="🎀", layout
 API_KEY = st.secrets["GEMINI_API_KEY"]
 genai.configure(api_key=API_KEY)
 
-# モデル設定 (Gemini 2.5 flash)
-model = genai.GenerativeModel('gemini-2.5-flash')
+# モデル設定 (Gemini 2.5 Pro)
+model = genai.GenerativeModel('gemini-2.5-pro')
 
 # JSON構造の定義
 tsundoku_schema = {
@@ -104,29 +104,34 @@ if not ws: st.stop()
 
 tab1, tab2 = st.tabs(["📥 登録", "📚 本棚"])
 
-# --- タブ1：登録（連続投稿対応） ---
+# --- タブ1：登録（修正版） ---
 with tab1:
-    # key="url_input" を指定することで、プログラムから中身を空にできるようにする
-    url = st.text_input("URLを貼り付け 👇", key="url_input")
+    # 【ここが修正ポイント】
+    # リセット用のカウンターを初期化
+    if 'input_key_counter' not in st.session_state:
+        st.session_state.input_key_counter = 0
+
+    # keyを動的に変えることで、強制的に新しい入力欄（空っぽ）を作る
+    dynamic_key = f"url_input_{st.session_state.input_key_counter}"
+    
+    url = st.text_input("URLを貼り付け 👇", key=dynamic_key)
 
     if st.button("✨ 解析スタート"):
         if not url:
             st.warning("URLが空です")
         else:
-            with st.spinner("Gemini 2.5 flashが解析中..."):
+            with st.spinner("Gemini 2.5 Proが解析中..."):
                 text = fetch_text(url)
                 if text:
                     result = analyze_text(text)
                     if result:
                         if add_to_sheet(ws, url, result):
-                            # 【ここが変更点】
-                            # 1. 邪魔にならないトースト通知を出す
                             st.toast("保存しました！次のURLをどうぞ✨", icon="🎉")
                             
-                            # 2. 入力欄を強制的に空にする
-                            st.session_state.url_input = ""
+                            # 【ここが修正ポイント】
+                            # カウンターを進めて、次のリロード時に新しいkey（空の入力欄）が作られるようにする
+                            st.session_state.input_key_counter += 1
                             
-                            # 3. 少し待ってからリロード（トーストを見せるため）
                             time.sleep(1)
                             st.rerun()
                         else:
@@ -170,4 +175,3 @@ with tab2:
                             
     except Exception as e:
         st.error(f"データ読み込みエラー: {e}")
-
