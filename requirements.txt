@@ -1,5 +1,5 @@
 streamlit
-google-generativeai
+google-generativeai>=0.6.0
 trafilatura
 gspread
 oauth2client
