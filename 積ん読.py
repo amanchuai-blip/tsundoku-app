@@ -13,8 +13,8 @@ st.set_page_config(page_title="積ん読解消♡Mate", page_icon="🎀", layout
 API_KEY = st.secrets["GEMINI_API_KEY"]
 genai.configure(api_key=API_KEY)
 
-# モデル設定 (Gemini 2.5 pro)
-model = genai.GenerativeModel('gemini-2.5-pro')
+# モデル設定 (Gemini 2.5 flash)
+model = genai.GenerativeModel('gemini-2.5-flash')
 
 # JSON構造の定義
 tsundoku_schema = {
@@ -113,7 +113,7 @@ with tab1:
         if not url:
             st.warning("URLが空です")
         else:
-            with st.spinner("Gemini 2.5 Proが解析中..."):
+            with st.spinner("Gemini 2.5 flashが解析中..."):
                 text = fetch_text(url)
                 if text:
                     result = analyze_text(text)
@@ -170,3 +170,4 @@ with tab2:
                             
     except Exception as e:
         st.error(f"データ読み込みエラー: {e}")
+
