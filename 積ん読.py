@@ -10,7 +10,8 @@ from oauth2client.service_account import ServiceAccountCredentials
 st.set_page_config(page_title="積ん読解消♡Mate", page_icon="🎀", layout="centered")
 
 # --- 2. 設定 ---
-API_KEY = "AIzaSyBWgr8g-cA6zybuyDHD9rhP2sS34uAj_24"
+# Secretsから安全にキーを取り出す
+API_KEY = st.secrets["GEMINI_API_KEY"] 
 genai.configure(api_key=API_KEY)
 
 # モデル設定 (JSONモード対応の最新版)
@@ -123,3 +124,4 @@ with tab2:
                 st.caption(f"URL: {item.get('url')}")
     except:
         st.error("データ読み込みエラー")
+
